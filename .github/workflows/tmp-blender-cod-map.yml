@@ -3,6 +3,9 @@ on:
   push:
     branches: [tmp/blender-cod-map-20260903]
   workflow_dispatch:
+concurrency:
+  group: tmp-blender-cod-map
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -22,7 +25,17 @@ jobs:
       - name: Decode and patch generator
         run: |
           cat .tmp-cod-map/chunk_00.txt .tmp-cod-map/chunk_01.txt .tmp-cod-map/chunk_02.txt | base64 -di | gzip -d > build_cod_map.py
-          sed -i "/scene=bpy.context.scene/a scene.world=bpy.data.worlds.new('World')" build_cod_map.py
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('build_cod_map.py')
+          s=p.read_text()
+          s=s.replace("scene=bpy.context.scene\n", "scene=bpy.context.scene\nscene.world=bpy.data.worlds.new('World')\n", 1)
+          s=s.replace("scene.render.resolution_x=960", "scene.render.resolution_x=800")
+          s=s.replace("scene.render.resolution_y=540", "scene.render.resolution_y=450")
+          s=s.replace("# render previews", "# Fast validation views: preserve Eevee as the authored final engine.\nfinal_engine=scene.render.engine\nscene.render.engine='BLENDER_WORKBENCH'\nscene.display.shading.light='STUDIO'\nscene.display.shading.color_type='MATERIAL'\nscene.display.shading.show_shadows=True\nscene.display.shading.show_cavity=True\n# render previews", 1)
+          s=s.replace("# save again with hero cam active", "scene.render.engine=final_engine\n# save again with hero cam active", 1)
+          p.write_text(s)
+          PY
           python -m py_compile build_cod_map.py
           wc -l -c build_cod_map.py
       - name: Generate Blender scene and validation renders
@@ -37,7 +50,7 @@ jobs:
           import bpy
           bpy.ops.wm.open_mainfile(filepath='coastal_intercept.blend')
           s=bpy.context.scene
-          print('objects', len(bpy.data.objects), 'meshes', sum(o.type=='MESH' for o in bpy.data.objects), 'materials', len(bpy.data.materials))
+          print('objects', len(bpy.data.objects), 'meshes', sum(o.type=='MESH' for o in bpy.data.objects), 'materials', len(bpy.data.materials), 'engine', s.render.engine)
           print('map', s.get('map_name'), s.get('dimensions_m'), s.get('lanes'))
           PY
       - uses: actions/upload-artifact@v4
