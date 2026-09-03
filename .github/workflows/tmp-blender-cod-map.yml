@@ -17,7 +17,7 @@ jobs:
       - name: Install Blender Python module
         run: python -m pip install --disable-pip-version-check bpy==5.2.1
       - name: Decode generator
-        run: base64 -d .tmp-cod-map/build_cod_map.py.gz.b64 | gzip -d > build_cod_map.py
+        run: cat .tmp-cod-map/chunk_00.txt .tmp-cod-map/chunk_01.txt .tmp-cod-map/chunk_02.txt | base64 -d | gzip -d > build_cod_map.py
       - name: Generate Blender scene and validation renders
         env:
           OUT_BLEND: ${{ github.workspace }}/coastal_intercept.blend
